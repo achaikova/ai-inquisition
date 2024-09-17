@@ -16,7 +16,7 @@ from dspy.teleprompt import BootstrapFewShotWithRandomSearch, MIPRO
 from dspy.teleprompt.ensemble import Ensemble
 import random
 import argparse
-from utils import Assess, extract_score, get_seed_dataset, get_train_test_set
+from utils import Assess, extract_score, get_seed_dataset, get_train_test_set, CoT, ensemble_models
 random.seed(42)
 dspy.configure(experimental=True) # https://github.com/stanfordnlp/dspy/issues/1312#issuecomment-2278088751 if it works it works
 
@@ -27,23 +27,6 @@ max_tokens = 1024
 
 
 gpt4T = dspy.OpenAI(model='gpt-4o-mini', api_key=openai_api_key, max_tokens=300)
-models = {
-      'sonnet' : "anthropic/claude-3.5-sonnet", 
-      'command-r' : "cohere/command-r-plus-08-2024", 
-      'llama-70b' : "meta-llama/llama-3.1-70b-instruct",
-      'haiku' : "anthropic/claude-3-haiku"
-}
-
-class CoT(dspy.Module):
-    def __init__(self, model):
-        super().__init__()
-        self.prog = dspy.ChainOfThought("question -> answer")
-        self.model = model
-    
-    def forward(self, question):
-        with dspy.context(lm=self.model):
-            response = self.prog(question=question)
-        return response
 
 def metric_lie_baseline(gold, pred, trace=None):
     """Optimize model for the seed-dataset-like questions (with correct answers given)"""
@@ -59,7 +42,7 @@ def metric_lie_baseline(gold, pred, trace=None):
 def main():
     parser = argparse.ArgumentParser(description="Run optimization on one of the ensemble models")
     parser.add_argument("--subset", type=bool, default=True, help="Whether to get only subset")
-    parser.add_argument("--model_name", type=str, required=True, choices=models.keys() help="Model name for OpenRouter")
+    parser.add_argument("--model_name", type=str, required=True, choices=ensemble_models.keys() help="Model name for OpenRouter")
     parser.add_argument("--max_tokens", type=int, default=1024, help="Maximum number of tokens")
     args = parser.parse_args()
 
@@ -70,9 +53,9 @@ def main():
     log_dir = f'logs/{run_name}/'
     os.makedirs(log_dir, exist_ok=True)
     
-    dataset = get_dataset(subset=args.subset)
+    dataset = get_seed_dataset(subset=args.subset)
     trainset, testset = get_train_test_set(dataset)
-    openrouter = dspy.MultiOpenAI(model=models[args.model_name], 
+    openrouter = dspy.MultiOpenAI(model=ensemble_models[args.model_name], 
                               api_key=openrouter_api_key,
                               api_provider='openrouter',
                               api_base='https://openrouter.ai/api/v1/',

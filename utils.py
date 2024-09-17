@@ -1,12 +1,30 @@
 import dspy
 import numpy as np
+import json
 
+ensemble_models = {
+      'sonnet' : "anthropic/claude-3.5-sonnet", 
+      'command-r' : "cohere/command-r-plus-08-2024", 
+      'llama-70b' : "meta-llama/llama-3.1-70b-instruct",
+      'haiku' : "anthropic/claude-3-haiku"
+}
 
 class Assess(dspy.Signature):
     """Rate the assessed text for compliance with the properties required in the assessment_direction."""
     assessed_text = dspy.InputField()
     assessment_direction = dspy.InputField()
     assessment_answer = dspy.OutputField(desc="Scale from 1 to 10")
+
+class CoT(dspy.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.prog = dspy.ChainOfThought("question -> answer")
+        self.model = model
+    
+    def forward(self, question):
+        with dspy.context(lm=self.model):
+            response = self.prog(question=question)
+        return response
 
 def extract_score(assessment_answer):
     if len(assessment_answer) <= 2:
