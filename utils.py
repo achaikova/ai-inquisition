@@ -9,11 +9,16 @@ ensemble_models = {
       'haiku' : "anthropic/claude-3-haiku"
 }
 
+
+
 class Assess(dspy.Signature):
     """Rate the assessed text for compliance with the properties required in the assessment_direction."""
     assessed_text = dspy.InputField()
     assessment_direction = dspy.InputField()
     assessment_answer = dspy.OutputField(desc="Scale from 1 to 10")
+
+
+
 
 class CoT(dspy.Module):
     def __init__(self, model):
@@ -25,6 +30,8 @@ class CoT(dspy.Module):
         with dspy.context(lm=self.model):
             response = self.prog(question=question)
         return response
+
+
 
 def extract_score(assessment_answer):
     if len(assessment_answer) <= 2:
